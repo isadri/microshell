@@ -4,11 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define CD_NUM "error: cd: bad arguments\n"
-#define CD_FAIL "error: cd: cannot change directory to "
-#define SYS_CALL "error: fatal\n"
-#define EXECVE_ERR "error: cannot execute "
-
 typedef struct s_ids
 {
 	pid_t			id;
@@ -51,6 +46,46 @@ void	clear(t_ids **ids)
 	*ids = NULL;
 }
 
+void	ft_dup2(int fd1, int fd2)
+{
+	if (dup2(fd1, fd2) == -1)
+	{
+		write(2, "error: fatal\n", 13);
+		exit(1);
+	}
+}
+
+void	ft_pipe(int fd[2])
+{
+	if (pipe(fd) == -1)
+	{
+		write(2, "error: fatal\n", 13);
+		exit(1);
+	}
+}
+
+void	ft_close(int fd)
+{
+	if (close(fd) == -1)
+	{
+		write(2, "error: fatal\n", 13);
+		exit(1);
+	}
+}
+
+int	ft_dup(int fd)
+{
+	int	fd_dup;
+
+	fd_dup = dup(fd);
+	if (fd_dup == -1)
+	{
+		write(2, "error: fatal\n", 13);
+		exit(1);
+	}
+	return (fd_dup);
+}
+
 size_t	ft_strlen(char *str)
 {
 	size_t	len;
@@ -73,7 +108,7 @@ int	ft_fork(void)
 
 void	print_error(char *cmd)
 {
-	write(2, EXECVE_ERR, 23);
+	write(2, "error: cannot execute ", 22);
 	write(2, cmd, ft_strlen(cmd));
 	write(2, "\n", 1);
 	exit(1);
@@ -113,12 +148,12 @@ void	execute_cd_cmd(char **args)
 {
 	if (args[1] == NULL || args[2])
 	{
-		write(2, CD_NUM, 26);
+		write(2, "error: cd: bad arguments\n", 25);
 		return;
 	}
 	if (chdir(args[1]) == -1)
 	{
-		write(2, CD_FAIL, 26);
+		write(2, "error: cd: cannot change directory to ", 38);
 		write(2, args[1], ft_strlen(args[1]));
 		write(2, "\n", 1);
 		return;
@@ -129,7 +164,7 @@ void	execute_one_cmd(char **args, char **env, int stdin_tmp)
 {
 	if (fork() == 0)
 	{
-		close(stdin_tmp);
+		ft_close(stdin_tmp);
 		execve(args[0], args, env);
 		print_error(args[0]);
 	}
@@ -141,8 +176,8 @@ void	redirect_io(int fd[2], int pipe_nbr, int cmd_nbr)
 		return ;
 	if (cmd_nbr < pipe_nbr)
 		dup2(fd[1], 1);
-	close(fd[0]);
-	close(fd[1]);
+	ft_close(fd[0]);
+	ft_close(fd[1]);
 }
 
 int	main(int ac, char **av, char **env)
@@ -162,7 +197,7 @@ int	main(int ac, char **av, char **env)
 	for (int f = 0; f < 10000; f++)
 		args[f] = NULL;
 	++av;
-	stdin_tmp = dup(0);
+	stdin_tmp = ft_dup(0);
 	i = -1;
 	while (++i < ac)
 	{
@@ -188,15 +223,15 @@ int	main(int ac, char **av, char **env)
 		id = 0;
 		while (i < ac && av[i] && strcmp(av[i], ";"))
 		{
-			pipe(fd);
+			ft_pipe(fd);
 			args_nbr = set_arguments(args, av + i);
 			if (strcmp(args[0], "cd") == 0)
 			{
 				execute_cd_cmd(args);
 				i += args_nbr;
-				dup2(fd[0], 0);
-				close(fd[0]);
-				close(fd[1]);
+				ft_dup2(fd[0], 0);
+				ft_close(fd[0]);
+				ft_close(fd[1]);
 				continue;
 			}
 			id = ft_fork();
@@ -204,23 +239,22 @@ int	main(int ac, char **av, char **env)
 			{
 				clear(&ids);
 				redirect_io(fd, pipe_nbr, cmd_nbr);
-				close(stdin_tmp);
+				ft_close(stdin_tmp);
 				execve(args[0], args, env);
 				print_error(args[0]);
 			}
 			add_id(&ids, id);
-			dup2(fd[0], 0);
-			close(fd[0]);
-			close(fd[1]);
+			ft_dup2(fd[0], 0);
+			ft_close(fd[0]);
+			ft_close(fd[1]);
 			cmd_nbr++;
 			i += args_nbr;
 		}
-		dup2(stdin_tmp, 0);
-		stdin_tmp = -1;
+		ft_dup2(stdin_tmp, 0);
 		for (t_ids *tmp = ids; tmp; tmp = tmp->next)
 			waitpid(tmp->id, NULL, 0);
 		clear(&ids);
 	}
-	close(stdin_tmp);
+	ft_close(stdin_tmp);
 	return (0);
 }
