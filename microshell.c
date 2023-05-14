@@ -81,18 +81,12 @@ void	execute_one_cmd(char **args, char **env)
 	}
 }
 
-void	close_pipe(int fd[2])
-{
-	close(fd[0]);
-	close(fd[1]);
-}
-
 void	redirect_io(int fd[2], int pipe_nbr)
 {
 	if (pipe_nbr == 0)
 		return ;
 	dup2(fd[1], 1);
-	close_pipe(fd);
+	close(fd[0]), close(fd[1]);
 }
 
 int	execute_single_cmd(char **av, char **env)
@@ -144,7 +138,7 @@ int	main(int ac, char **av, char **env)
 				execute_cd_cmd(av);
 				i += args_nbr;
 				dup2(fd[0], 0);
-				close_pipe(fd);
+				close(fd[0]), close(fd[1]);
 				continue;
 			}
 			id = fork();
@@ -155,7 +149,7 @@ int	main(int ac, char **av, char **env)
 				print_error(av[i]);
 			}
 			dup2(fd[0], 0);
-			close_pipe(fd);
+			close(fd[0]), close(fd[1]);
 			--pipe_nbr;
 			i += args_nbr;
 		}
