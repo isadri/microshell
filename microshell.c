@@ -145,8 +145,13 @@ void	redirect_io(int fd[2], int pipe_nbr)
 	close_pipe(fd);
 }
 
-void	execute_single_cmd(char **av, char **env)
+int	execute_single_cmd(char **av, char **env)
 {
+	int	args_nbr;
+
+	args_nbr = set_arguments(av);
+	if (args_nbr == 0)
+		return (0);
 	if (strcmp(av[0], "cd") == 0)
 		execute_cd_cmd(av);
 	else
@@ -154,6 +159,7 @@ void	execute_single_cmd(char **av, char **env)
 		execute_one_cmd(av, env);
 		wait(NULL);
 	}
+	return (args_nbr);
 }
 
 int	main(int ac, char **av, char **env)
@@ -175,11 +181,7 @@ int	main(int ac, char **av, char **env)
 		pipe_nbr = count_pipes(av + i);
 		if (pipe_nbr == 0)
 		{
-			args_nbr = set_arguments(av + i);
-			if (args_nbr == 0)
-				continue ;
-			execute_single_cmd(av + i, env);
-			i += args_nbr;
+			i += execute_single_cmd(av + i, env);
 			continue ;
 		}
 		id = 0;
