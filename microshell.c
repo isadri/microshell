@@ -4,48 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct s_ids
-{
-	pid_t			id;
-	struct s_ids	*next;
-}	t_ids;
-
-t_ids	*last_id(t_ids *ids)
-{
-	while (ids && ids->next)
-		ids = ids->next;
-	return (ids);
-}
-
-void	add_id(t_ids **ids, pid_t id)
-{
-	t_ids	*tmp;
-
-	if (*ids == NULL)
-	{
-		*ids = malloc(sizeof(t_ids));
-		(*ids)->id = id;
-		(*ids)->next = NULL;
-		return ;
-	}
-	tmp = NULL;
-	add_id(&tmp, id);
-	last_id(*ids)->next = tmp;
-}
-
-void	clear(t_ids **ids)
-{
-	t_ids	*tmp;
-
-	while (*ids)
-	{
-		tmp = *ids;
-		*ids = (*ids)->next;
-		free(tmp);
-	}
-	*ids = NULL;
-}
-
 void	ft_dup2(int fd1, int fd2)
 {
 	if (dup2(fd1, fd2) == -1)
@@ -130,18 +88,22 @@ int	count_pipes(char **av)
 	return (pipe_nbr);
 }
 
-int	set_arguments(char **args, char **av)
+int	set_arguments(char **av)
 {
+	int	ret_val;
 	int	i;
 
 	i = 0;
 	while (av[i] && strcmp(av[i], "|") && strcmp(av[i], ";"))
-	{
-		args[i] = av[i];
 		i++;
-	}
-	args[i] = NULL;
-	return (av[i] && !strcmp(av[i], "|") ? i + 1 : i);
+	if (av[i] == NULL)
+		return (i);
+	if (strcmp(av[i], "|") == 0)
+		ret_val = i + 1;
+	else
+		ret_val = i;
+	av[i] = NULL;
+	return (ret_val);
 }
 
 void	execute_cd_cmd(char **args)
@@ -182,8 +144,6 @@ void	redirect_io(int fd[2], int pipe_nbr, int cmd_nbr)
 
 int	main(int ac, char **av, char **env)
 {
-	char	*args[10000];
-	t_ids	*ids;
 	int		stdin_tmp;
 	int		pipe_nbr;
 	int		args_nbr;
@@ -194,8 +154,6 @@ int	main(int ac, char **av, char **env)
 
 	if (ac < 2)
 		exit(0);
-	for (int f = 0; f < 10000; f++)
-		args[f] = NULL;
 	++av;
 	stdin_tmp = ft_dup(0);
 	i = -1;
@@ -204,30 +162,29 @@ int	main(int ac, char **av, char **env)
 		pipe_nbr = count_pipes(av + i);
 		if (pipe_nbr == 0)
 		{
-			args_nbr = set_arguments(args, av + i);
+			args_nbr = set_arguments(av + i);
 			if (args_nbr != 0)
 			{
-				if (strcmp(args[0], "cd") == 0)
-					execute_cd_cmd(args);
+				if (strcmp(av[ + i], "cd") == 0)
+					execute_cd_cmd(av + i);
 				else
 				{
-					execute_one_cmd(args, env, stdin_tmp);
+					execute_one_cmd(av + i, env, stdin_tmp);
 					wait(NULL);
 				}
 			}
 			i += args_nbr;
 			continue ;
 		}
-		ids = NULL;
 		cmd_nbr = 0;
 		id = 0;
 		while (i < ac && av[i] && strcmp(av[i], ";"))
 		{
 			ft_pipe(fd);
-			args_nbr = set_arguments(args, av + i);
-			if (strcmp(args[0], "cd") == 0)
+			args_nbr = set_arguments(av + i);
+			if (strcmp(av[i], "cd") == 0)
 			{
-				execute_cd_cmd(args);
+				execute_cd_cmd(av);
 				i += args_nbr;
 				ft_dup2(fd[0], 0);
 				ft_close(fd[0]);
@@ -237,13 +194,11 @@ int	main(int ac, char **av, char **env)
 			id = ft_fork();
 			if (id == 0)
 			{
-				clear(&ids);
 				redirect_io(fd, pipe_nbr, cmd_nbr);
 				ft_close(stdin_tmp);
-				execve(args[0], args, env);
-				print_error(args[0]);
+				execve(av[i], av + i, env);
+				print_error(av[i]);
 			}
-			add_id(&ids, id);
 			ft_dup2(fd[0], 0);
 			ft_close(fd[0]);
 			ft_close(fd[1]);
@@ -251,9 +206,8 @@ int	main(int ac, char **av, char **env)
 			i += args_nbr;
 		}
 		ft_dup2(stdin_tmp, 0);
-		for (t_ids *tmp = ids; tmp; tmp = tmp->next)
-			waitpid(tmp->id, NULL, 0);
-		clear(&ids);
+		while (waitpid(-1, NULL, 0) != -1)
+			;
 	}
 	ft_close(stdin_tmp);
 	return (0);
