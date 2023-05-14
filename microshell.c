@@ -4,46 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void	ft_dup2(int fd1, int fd2)
-{
-	if (dup2(fd1, fd2) == -1)
-	{
-		write(2, "error: fatal\n", 13);
-		exit(1);
-	}
-}
-
-void	ft_pipe(int fd[2])
-{
-	if (pipe(fd) == -1)
-	{
-		write(2, "error: fatal\n", 13);
-		exit(1);
-	}
-}
-
-void	ft_close(int fd)
-{
-	if (close(fd) == -1)
-	{
-		write(2, "error: fatal\n", 13);
-		exit(1);
-	}
-}
-
-int	ft_dup(int fd)
-{
-	int	fd_dup;
-
-	fd_dup = dup(fd);
-	if (fd_dup == -1)
-	{
-		write(2, "error: fatal\n", 13);
-		exit(1);
-	}
-	return (fd_dup);
-}
-
 size_t	ft_strlen(char *str)
 {
 	size_t	len;
@@ -52,16 +12,6 @@ size_t	ft_strlen(char *str)
 	while (str[len])
 		len++;
 	return (len);
-}
-
-int	ft_fork(void)
-{
-	int	id;
-
-	id = fork();
-	if (id == -1)
-		exit(1);
-	return (id);
 }
 
 void	print_error(char *cmd)
@@ -133,15 +83,15 @@ void	execute_one_cmd(char **args, char **env)
 
 void	close_pipe(int fd[2])
 {
-	ft_close(fd[0]);
-	ft_close(fd[1]);
+	close(fd[0]);
+	close(fd[1]);
 }
 
 void	redirect_io(int fd[2], int pipe_nbr)
 {
 	if (pipe_nbr == 0)
 		return ;
-	ft_dup2(fd[1], 1);
+	dup2(fd[1], 1);
 	close_pipe(fd);
 }
 
@@ -174,7 +124,7 @@ int	main(int ac, char **av, char **env)
 	if (ac < 2)
 		exit(1);
 	++av;
-	stdin_tmp = ft_dup(0);
+	stdin_tmp = dup(0);
 	i = -1;
 	while (++i < ac)
 	{
@@ -187,32 +137,32 @@ int	main(int ac, char **av, char **env)
 		id = 0;
 		while (i < ac && av[i] && strcmp(av[i], ";"))
 		{
-			ft_pipe(fd);
+			pipe(fd);
 			args_nbr = set_arguments(av + i);
 			if (strcmp(av[i], "cd") == 0)
 			{
 				execute_cd_cmd(av);
 				i += args_nbr;
-				ft_dup2(fd[0], 0);
+				dup2(fd[0], 0);
 				close_pipe(fd);
 				continue;
 			}
-			id = ft_fork();
+			id = fork();
 			if (id == 0)
 			{
 				redirect_io(fd, pipe_nbr);
 				execve(av[i], av + i, env);
 				print_error(av[i]);
 			}
-			ft_dup2(fd[0], 0);
+			dup2(fd[0], 0);
 			close_pipe(fd);
 			--pipe_nbr;
 			i += args_nbr;
 		}
-		ft_dup2(stdin_tmp, 0);
+		dup2(stdin_tmp, 0);
 		while (waitpid(-1, NULL, 0) != -1)
 			;
 	}
-	ft_close(stdin_tmp);
+	close(stdin_tmp);
 	return (0);
 }
