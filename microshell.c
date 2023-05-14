@@ -122,24 +122,38 @@ void	execute_cd_cmd(char **args)
 	}
 }
 
-void	execute_one_cmd(char **args, char **env, int stdin_tmp)
+void	execute_one_cmd(char **args, char **env)
 {
 	if (fork() == 0)
 	{
-		ft_close(stdin_tmp);
 		execve(args[0], args, env);
 		print_error(args[0]);
 	}
 }
 
-void	redirect_io(int fd[2], int pipe_nbr, int cmd_nbr)
+void	close_pipe(int fd[2])
+{
+	ft_close(fd[0]);
+	ft_close(fd[1]);
+}
+
+void	redirect_io(int fd[2], int pipe_nbr)
 {
 	if (pipe_nbr == 0)
 		return ;
-	if (cmd_nbr < pipe_nbr)
-		dup2(fd[1], 1);
-	ft_close(fd[0]);
-	ft_close(fd[1]);
+	ft_dup2(fd[1], 1);
+	close_pipe(fd);
+}
+
+void	execute_single_cmd(char **av, char **env)
+{
+	if (strcmp(av[0], "cd") == 0)
+		execute_cd_cmd(av);
+	else
+	{
+		execute_one_cmd(av, env);
+		wait(NULL);
+	}
 }
 
 int	main(int ac, char **av, char **env)
@@ -147,13 +161,12 @@ int	main(int ac, char **av, char **env)
 	int		stdin_tmp;
 	int		pipe_nbr;
 	int		args_nbr;
-	int		cmd_nbr;
 	int		fd[2];
 	pid_t	id;
 	int		i;
 
 	if (ac < 2)
-		exit(0);
+		exit(1);
 	++av;
 	stdin_tmp = ft_dup(0);
 	i = -1;
@@ -163,20 +176,12 @@ int	main(int ac, char **av, char **env)
 		if (pipe_nbr == 0)
 		{
 			args_nbr = set_arguments(av + i);
-			if (args_nbr != 0)
-			{
-				if (strcmp(av[ + i], "cd") == 0)
-					execute_cd_cmd(av + i);
-				else
-				{
-					execute_one_cmd(av + i, env, stdin_tmp);
-					wait(NULL);
-				}
-			}
+			if (args_nbr == 0)
+				continue ;
+			execute_single_cmd(av + i, env);
 			i += args_nbr;
 			continue ;
 		}
-		cmd_nbr = 0;
 		id = 0;
 		while (i < ac && av[i] && strcmp(av[i], ";"))
 		{
@@ -187,22 +192,19 @@ int	main(int ac, char **av, char **env)
 				execute_cd_cmd(av);
 				i += args_nbr;
 				ft_dup2(fd[0], 0);
-				ft_close(fd[0]);
-				ft_close(fd[1]);
+				close_pipe(fd);
 				continue;
 			}
 			id = ft_fork();
 			if (id == 0)
 			{
-				redirect_io(fd, pipe_nbr, cmd_nbr);
-				ft_close(stdin_tmp);
+				redirect_io(fd, pipe_nbr);
 				execve(av[i], av + i, env);
 				print_error(av[i]);
 			}
 			ft_dup2(fd[0], 0);
-			ft_close(fd[0]);
-			ft_close(fd[1]);
-			cmd_nbr++;
+			close_pipe(fd);
+			--pipe_nbr;
 			i += args_nbr;
 		}
 		ft_dup2(stdin_tmp, 0);
